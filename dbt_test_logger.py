@@ -1,35 +1,77 @@
 import subprocess
 import psycopg2
-from datetime import datetime
+from datetime import datetime, timezone
+import json
 import os
 
-# Agregar ruta a dbt.exe al PATH para que se encuentre el ejecutable
+# Agregar ruta a dbt.exe al PATH (ajustar si dbt está en otra ruta)
 os.environ['PATH'] += r";C:\Users\josed\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-packages\Python312\Scripts"
 
-# Datos de conexión a Neon
+# Configuración base de datos
 DB_HOST = 'ep-aged-flower-acuqk2rl.sa-east-1.aws.neon.tech'
 DB_PORT = 5432
 DB_NAME = 'neondb'
 DB_USER = 'neondb_owner'
-DB_PASS = 'npg_cXzbEB42GQIA'  # ⚠️ NO lo compartas en entornos públicos
+DB_PASS = 'npg_cXzbEB42GQIA'
 
-# Ejecutar dbt test y procesar los resultados
-def run_dbt_tests_and_log():
-    print("Ejecutando dbt test...")
-    
+def run_dbt_tests():
+    print("▶️ Ejecutando dbt test...")
     result = subprocess.run(
-        [r"C:\Users\josed\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-packages\Python312\Scripts\dbt.exe", 'test'],
+        ["dbt", "test", "--store-failures"],
         capture_output=True,
         text=True
     )
+    print("STDOUT:\n", result.stdout)
+    print("STDERR:\n", result.stderr)
+    if result.returncode != 0:
+        print(f"❌ Error al ejecutar dbt test (código {result.returncode})")
+    else:
+        print("✅ dbt test ejecutado correctamente")
+    return result.returncode == 0
 
-    stdout_lines = result.stdout.strip().split('\n')
-    print("STDOUT:")
-    print(result.stdout)
-    print("STDERR:")
-    print(result.stderr)
+def parse_and_log_results(conn):
+    run_results_path = os.path.join("target", "run_results.json")
+    if not os.path.exists(run_results_path):
+        print("⚠️ No se encontró el archivo run_results.json. ¿Se ejecutó dbt test?")
+        return
 
-    # Crear conexión a PostgreSQL
+    with open(run_results_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    results = data.get("results", [])
+    if not results:
+        print("ℹ️ No se encontraron resultados en run_results.json")
+        return
+
+    now = datetime.now(timezone.utc)
+    cursor = conn.cursor()
+
+    insert_sql = """
+        INSERT INTO dbt_test_logs (test_name, model_name, status, error_message, execution_time)
+        VALUES (%s, %s, %s, %s, %s)
+    """
+
+    inserted_count = 0
+    for result in results:
+        # No filtramos por resource_type porque no existe en el JSON
+        test_name = result.get("unique_id", "")
+        # Extraer modelo desde unique_id (ajustar si el formato cambia)
+        model_name = test_name.split(".")[2] if len(test_name.split(".")) > 2 else ""
+
+        status = result.get("status", "unknown")
+        error_message = result.get("message", None)
+
+        cursor.execute(insert_sql, (test_name, model_name, status, error_message, now))
+        inserted_count += 1
+
+    conn.commit()
+    cursor.close()
+
+    print(f"✅ Se insertaron {inserted_count} registros en dbt_test_logs.")
+
+def main():
+    success = run_dbt_tests()
+
     try:
         conn = psycopg2.connect(
             host=DB_HOST,
@@ -39,56 +81,13 @@ def run_dbt_tests_and_log():
             password=DB_PASS,
             sslmode='require'
         )
-        cursor = conn.cursor()
-        now = datetime.utcnow()
-        execution_id = now.strftime("%Y%m%d%H%M%S")
-
-        insert_sql = """
-        INSERT INTO dbt_test_logs (execution_id, test_name, model_name, status, error_message, execution_time)
-        VALUES (%s, %s, %s, %s, %s, %s)
-        """
-
-        for line in stdout_lines:
-            if line.startswith("PASS") or line.startswith("FAIL"):
-                parts = line.split()
-                if len(parts) < 4:
-                    continue  # línea incompleta
-
-                status = parts[0]  # PASS o FAIL
-                test_full_name = parts[1]  # Ej: test_not_null_users_user_id
-                execution_time_raw = parts[-1].strip("[]")  # Ej: 0.23s
-
-                # Intentar extraer test_name y model_name
-                try:
-                    test_parts = test_full_name.split('_')
-                    test_name = test_parts[1]  # not_null
-                    model_name = "_".join(test_parts[2:-1])  # users
-                except Exception:
-                    test_name = test_full_name
-                    model_name = "desconocido"
-
-                error_message = line if status == "FAIL" else None
-                execution_time = float(execution_time_raw.replace("s", ""))
-
-                cursor.execute(insert_sql, (
-                    execution_id,
-                    test_name,
-                    model_name,
-                    status,
-                    error_message,
-                    execution_time
-                ))
-
-        conn.commit()
-        cursor.close()
+        parse_and_log_results(conn)
         conn.close()
-        print("Resultados de dbt test insertados en dbt_test_logs.")
-
     except Exception as e:
-        print("Error conectando o insertando en la base:", e)
+        print("❌ Error conectando a la base de datos:", e)
 
-def main():
-    run_dbt_tests_and_log()
+    if not success:
+        print("❌ El comando dbt test terminó con error, pero los resultados fueron registrados.")
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
