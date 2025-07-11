@@ -12,7 +12,6 @@ clientes_clean as (
 productos_clean as (
     select *
     from {{ ref('productos') }}
-    where categoria in ('bebida', 'comida', 'postre')
 )
 
 select
