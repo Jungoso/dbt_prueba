@@ -25,4 +25,4 @@ select
     p.categoria as producto_categoria
 from ordenes_clean o
 left join clientes_clean c on o.cliente_id = c.id
-left join productos_clean p on o.producto_id = p.producto_id
+left join productos_clean p on p.producto_id = p.producto_id
