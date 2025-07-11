@@ -1,2 +1,3 @@
-select * from {{ ref('clientes_base') }}
+select *
+from {{ source('staging', 'clientes_base') }}
 where estado in ('activa', 'inactiva')

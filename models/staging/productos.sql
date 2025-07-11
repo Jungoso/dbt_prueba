@@ -1,5 +1,5 @@
 select
-  p.id as producto_id,
-  p.nombre,
-  p.precio
-from {{ ref('productos_base') }} p
+  id as producto_id,
+  nombre,
+  precio
+from {{ source('staging', 'productos_base') }}

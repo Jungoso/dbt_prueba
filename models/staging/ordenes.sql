@@ -1,6 +1,6 @@
 select
-  o.id as orden_id,
-  o.fecha,
-  o.total,
-  o.cliente_id
-from {{ ref('ordenes_base') }} o
+  id as orden_id,
+  cliente_id,
+  fecha,
+  total
+from {{ source('staging', 'ordenes_base') }}
