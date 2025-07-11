@@ -1,43 +1,128 @@
 version: 2
 
 sources:
-  - name: staging   
-    schema: public          
+  - name: staging
+    schema: public
     tables:
-      - name: productos_base
       - name: clientes_base
       - name: ordenes_base
+      - name: productos_base
 
 models:
   - name: clientes
-    description: Tabla limpia de clientes
+    description: "Tabla limpia de clientes"
     columns:
       - name: id
+        description: "ID único de cliente"
         tests:
           - unique
           - not_null
       - name: estado
+        description: "Estado del cliente"
         tests:
           - accepted_values:
-              values: ['activa', 'inactiva']
+              values: ['activa', 'inactiva', 'pendiente', 'suspendida']
 
   - name: ordenes
-    description: Tabla de órdenes
+    description: "Tabla limpia de órdenes"
     columns:
       - name: orden_id
+        description: "ID único de la orden"
         tests:
           - unique
           - not_null
       - name: cliente_id
+        description: "ID del cliente que hizo la orden"
         tests:
+          - not_null
           - relationships:
               to: ref('clientes')
               field: id
+      - name: fecha
+        description: "Fecha en que se realizó la orden"
+        tests:
+          - not_null
+      - name: total
+        description: "Total monetario de la orden"
+        tests:
+          - not_null
+          - expression_is_true:
+              expression: "total > 0"
+
+    tests:
+      - unique_combination_of_columns:
+          combination_of_columns: ['cliente_id', 'fecha']
 
   - name: productos
-    description: Tabla de productos
+    description: "Tabla limpia de productos"
     columns:
       - name: producto_id
+        description: "ID único del producto"
         tests:
           - unique
           - not_null
+      - name: nombre
+        description: "Nombre del producto"
+        tests:
+          - not_null
+      - name: categoria
+        description: "Categoría del producto"
+        tests:
+          - accepted_values:
+              values: ['bebida', 'comida', 'postre', 'otro']
+  - name: ordenes_enriquecidas
+    description: "Modelo intermedio que une órdenes con clientes y productos"
+    columns:
+      - name: orden_id
+        description: "ID único de la orden"
+        tests:
+          - unique
+          - not_null
+      - name: cliente_id
+        description: "ID del cliente"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('clientes')
+              field: id
+      - name: fecha
+        description: "Fecha de la orden"
+        tests:
+          - not_null
+      - name: total
+        description: "Total monetario de la orden"
+        tests:
+          - expression_is_true:
+              expression: "total > 0"
+      - name: producto_id
+        description: "ID del producto"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('productos')
+              field: producto_id
+
+  - name: ventas_por_cliente_mes
+    description: "Resumen mensual de ventas por cliente"
+    columns:
+      - name: cliente_id
+        description: "ID del cliente"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('clientes')
+              field: id
+      - name: mes
+        description: "Mes del resumen"
+        tests:
+          - not_null
+      - name: total_ventas
+        description: "Total de ventas del mes"
+        tests:
+          - expression_is_true:
+              expression: "total_ventas >= 0"
+      - name: cantidad_ordenes
+        description: "Cantidad de órdenes en el mes"
+        tests:
+          - expression_is_true:
+              expression: "cantidad_ordenes >= 0"
