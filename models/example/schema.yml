@@ -2,30 +2,44 @@ version: 2
 
 models:
   - name: clientes
-    description: "Clientes registrados"
+    description: "Listado de clientes"
     columns:
       - name: cliente_id
-        description: "Identificador único del cliente"
         tests:
           - not_null
           - unique
       - name: estado
-        description: "Estado de actividad del cliente"
         tests:
           - accepted_values:
               values: ['activa', 'inactiva']
 
+  - name: productos
+    description: "Catálogo de productos"
+    columns:
+      - name: producto_id
+        tests:
+          - not_null
+          - unique
+
   - name: ventas
-    description: "Ventas realizadas"
+    description: "Detalle de ventas"
     columns:
       - name: venta_id
         tests:
           - not_null
           - unique
       - name: cliente_id
-        description: "Debe existir en la tabla de clientes"
         tests:
           - not_null
           - relationships:
               to: ref('clientes')
               field: cliente_id
+      - name: producto_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('productos')
+              field: producto_id
+      - name: monto
+        tests:
+          - not_null
