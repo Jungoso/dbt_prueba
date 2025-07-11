@@ -1,5 +1,13 @@
 version: 2
 
+sources:
+  - name: staging   
+    schema: public          
+    tables:
+      - name: productos_base
+      - name: clientes_base
+      - name: ordenes_base
+
 models:
   - name: clientes
     description: Tabla limpia de clientes
