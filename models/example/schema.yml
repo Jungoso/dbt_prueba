@@ -1,9 +1,31 @@
 version: 2
 
 models:
-  - name: hola_neon
-    description: Modelo de prueba básico
+  - name: clientes
+    description: "Clientes registrados"
     columns:
-      - name: id
+      - name: cliente_id
+        description: "Identificador único del cliente"
         tests:
           - not_null
+          - unique
+      - name: estado
+        description: "Estado de actividad del cliente"
+        tests:
+          - accepted_values:
+              values: ['activa', 'inactiva']
+
+  - name: ventas
+    description: "Ventas realizadas"
+    columns:
+      - name: venta_id
+        tests:
+          - not_null
+          - unique
+      - name: cliente_id
+        description: "Debe existir en la tabla de clientes"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('clientes')
+              field: cliente_id
