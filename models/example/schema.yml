@@ -1,7 +1,8 @@
 version: 2
 
 models:
-  - name: ejemplo
+  - name: hola_neon
+    description: Modelo de prueba básico
     columns:
       - name: id
         tests:
